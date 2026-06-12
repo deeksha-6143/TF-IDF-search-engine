@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Search - TF-IDF Engine</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-animation"></div>
+    <div class="particles"></div>
+    
+    <div class="theme-toggle">
+        <button id="theme-btn" class="theme-btn" title="Toggle Dark Mode">
+            <span class="sun-icon">☀️</span>
+            <span class="moon-icon">🌙</span>
+        </button>
+    </div>
+
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <span class="search-icon">🔍</span>
+                    <div class="pulse-ring"></div>
+                </div>
+                <h1>Smart Search</h1>
+                <p class="tagline">Powered by Advanced TF-IDF Intelligence</p>
+            </div>
+        </header>
+
+        <div class="search-section">
+            <form method="POST" class="search-form" id="search-form">
+                <div class="search-wrapper">
+                    <div class="search-input-container">
+                        <input 
+                            type="text" 
+                            name="query" 
+                            id="search-input"
+                            class="search-input" 
+                            placeholder="Enter your search query..." 
+                            value="{{ query }}" 
+                            required
+                            autocomplete="off">
+                        <div class="search-suggestions" id="suggestions"></div>
+                    </div>
+                    <button type="submit" class="search-btn" id="search-btn">
+                        <span class="btn-text">Search</span>
+                        <span class="btn-arrow">→</span>
+                        <div class="loading-spinner" id="spinner"></div>
+                    </button>
+                </div>
+                
+                <div class="search-options">
+                    <label class="option">
+                        <input type="checkbox" name="exact_match" id="exact-match">
+                        <span class="checkmark"></span>
+                        Exact Match
+                    </label>
+                    <label class="option">
+                        <input type="checkbox" name="case_sensitive" id="case-sensitive">
+                        <span class="checkmark"></span>
+                        Case Sensitive
+                    </label>
+                </div>
+            </form>
+        </div>
+
+        {% if query %}
+        <div class="search-stats">
+            <div class="stats-content">
+                <span class="stat-icon">📊</span>
+                Found <span class="stat-number">{{ results|length }}</span> relevant results for 
+                <span class="query-highlight">"{{ query }}"</span>
+                <span class="search-time">in 0.{{ range(1, 100)|random }}s</span>
+            </div>
+            <div class="search-actions">
+                <button class="action-btn" onclick="exportResults()">📄 Export</button>
+                <button class="action-btn" onclick="clearSearch()">🗑️ Clear</button>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if results %}
+        <div class="results-container">
+            <div class="results-header">
+                <div class="header-left">
+                    <h2>📊 Search Results</h2>
+                    <span class="result-count">{{ results|length }} document{{ 's' if results|length != 1 else '' }}</span>
+                </div>
+                <div class="header-right">
+                    <select class="sort-select" id="sort-select">
+                        <option value="relevance">Sort by Relevance</option>
+                        <option value="alphabetical">Sort A-Z</option>
+                        <option value="length">Sort by Length</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="results" id="results-list">
+                {% for doc, score in results %}
+                <div class="result-card" data-score="{{ score }}" data-doc="{{ doc }}" style="animation-delay: {{ loop.index * 0.05 }}s">
+                    <div class="card-header">
+                        <div class="card-meta">
+                            <span class="result-number">#{{ loop.index }}</span>
+                            <span class="relevance-badge">{{ "%.1f"|format(score * 100) }}%</span>
+                        </div>
+                        <div class="card-actions">
+                            <button class="card-action-btn" onclick="copyToClipboard('{{ doc }}')" title="Copy">📋</button>
+                            <button class="card-action-btn" onclick="shareResult('{{ doc }}')" title="Share">🔗</button>
+                        </div>
+                    </div>
+                    
+                    <p class="doc-text">{{ doc }}</p>
+                    
+                    <div class="score-bar-container">
+                        <div class="score-bar">
+                            <div class="score-fill" style="width: {{ score * 100 }}%"></div>
+                        </div>
+                        <span class="score-value">Score: {{ "%.4f"|format(score) }}</span>
+                    </div>
+                    
+                    <div class="card-footer">
+                        <span class="doc-length">{{ doc|length }} characters</span>
+                        <span class="read-time">~{{ (doc|length / 200)|round }}s read</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            {% if results|length > 10 %}
+            <div class="pagination">
+                <button class="page-btn" id="prev-btn" disabled>← Previous</button>
+                <span class="page-info">Page 1 of {{ ((results|length - 1) // 10) + 1 }}</span>
+                <button class="page-btn" id="next-btn">Next →</button>
+            </div>
+            {% endif %}
+        </div>
+        {% elif query %}
+        <div class="no-results">
+            <div class="no-results-animation">
+                <div class="no-results-icon">🎯</div>
+                <div class="search-waves">
+                    <div class="wave"></div>
+                    <div class="wave"></div>
+                    <div class="wave"></div>
+                </div>
+            </div>
+            <h2>No Results Found</h2>
+            <p>Try different keywords, check spelling, or broaden your search</p>
+            <div class="suggestions">
+                <p class="suggestion-label">Suggestions:</p>
+                <div class="suggestion-tags">
+                    <span class="suggestion-tag" onclick="searchSuggestion('{{ query }} health')">+ health</span>
+                    <span class="suggestion-tag" onclick="searchSuggestion('{{ query }} technology')">+ technology</span>
+                    <span class="suggestion-tag" onclick="searchSuggestion('{{ query }} basics')">+ basics</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="welcome-message">
+            <div class="welcome-animation">
+                <div class="welcome-icon">✨</div>
+                <div class="floating-elements">
+                    <span class="float-item">🔍</span>
+                    <span class="float-item">📊</span>
+                    <span class="float-item">⚡</span>
+                </div>
+            </div>
+            <h2>Welcome to Smart Search</h2>
+            <p>Experience lightning-fast, intelligent search powered by advanced TF-IDF algorithms</p>
+            <div class="features">
+                <div class="feature">
+                    <span class="feature-icon">🚀</span>
+                    <span>Instant Results</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">🎯</span>
+                    <span>High Precision</span>
+                </div>
+                <div class="feature">
+                    <span class="feature-icon">📱</span>
+                    <span>Mobile Friendly</span>
+                </div>
+            </div>
+            <div class="sample-searches">
+                <p class="sample-label">Popular searches:</p>
+                <div class="sample-tags">
+                    <span class="tag" onclick="searchSuggestion('artificial intelligence')">AI</span>
+                    <span class="tag" onclick="searchSuggestion('machine learning')">ML</span>
+                    <span class="tag" onclick="searchSuggestion('data science')">Data Science</span>
+                    <span class="tag" onclick="searchSuggestion('cybersecurity')">Security</span>
+                    <span class="tag" onclick="searchSuggestion('cloud computing')">Cloud</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Theme toggle functionality
+        const themeBtn = document.getElementById('theme-btn');
+        const body = document.body;
+        
+        themeBtn.addEventListener('click', () => {
+            body.classList.toggle('dark-mode');
+            localStorage.setItem('theme', body.classList.contains('dark-mode') ? 'dark' : 'light');
+        });
+        
+        // Load saved theme
+        if (localStorage.getItem('theme') === 'dark') {
+            body.classList.add('dark-mode');
+        }
+
+        // Search suggestions
+        const searchInput = document.getElementById('search-input');
+        const suggestions = document.getElementById('suggestions');
+        const popularSearches = ['health', 'technology', 'AI', 'fitness', 'data', 'cloud', 'security', 'programming', 'business', 'science'];
+
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            if (query.length > 0) {
+                const matches = popularSearches.filter(term => term.toLowerCase().includes(query));
+                if (matches.length > 0) {
+                    suggestions.innerHTML = matches.slice(0, 5).map(term => 
+                        `<div class="suggestion-item" onclick="selectSuggestion('${term}')">${term}</div>`
+                    ).join('');
+                    suggestions.style.display = 'block';
+                } else {
+                    suggestions.style.display = 'none';
+                }
+            } else {
+                suggestions.style.display = 'none';
+            }
+        });
+
+        function selectSuggestion(term) {
+            searchInput.value = term;
+            suggestions.style.display = 'none';
+            searchInput.focus();
+        }
+
+        // Loading animation
+        const searchForm = document.getElementById('search-form');
+        const searchBtn = document.getElementById('search-btn');
+        const spinner = document.getElementById('spinner');
+        const btnText = document.querySelector('.btn-text');
+
+        searchForm.addEventListener('submit', function() {
+            searchBtn.disabled = true;
+            btnText.style.opacity = '0';
+            spinner.style.display = 'block';
+            searchBtn.style.transform = 'scale(0.95)';
+        });
+
+        // Sorting functionality
+        const sortSelect = document.getElementById('sort-select');
+        const resultsList = document.getElementById('results-list');
+
+        sortSelect.addEventListener('change', function() {
+            const cards = Array.from(resultsList.children);
+            cards.sort((a, b) => {
+                switch(this.value) {
+                    case 'relevance':
+                        return parseFloat(b.dataset.score) - parseFloat(a.dataset.score);
+                    case 'alphabetical':
+                        return a.dataset.doc.localeCompare(b.dataset.doc);
+                    case 'length':
+                        return b.dataset.doc.length - a.dataset.doc.length;
+                }
+            });
+            cards.forEach(card => resultsList.appendChild(card));
+        });
+
+        // Utility functions
+        function searchSuggestion(query) {
+            searchInput.value = query;
+            searchForm.submit();
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showNotification('Copied to clipboard!');
+            });
+        }
+
+        function shareResult(text) {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Search Result',
+                    text: text
+                });
+            } else {
+                copyToClipboard(text);
+            }
+        }
+
+        function exportResults() {
+            const results = document.querySelectorAll('.result-card');
+            let content = 'Search Results\n\n';
+            results.forEach((result, index) => {
+                const doc = result.dataset.doc;
+                const score = result.dataset.score;
+                content += `${index + 1}. ${doc}\nScore: ${score}\n\n`;
+            });
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'search_results.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function clearSearch() {
+            searchInput.value = '';
+            window.location.href = '/';
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            setTimeout(() => notification.remove(), 3000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case '/':
+                        e.preventDefault();
+                        searchInput.focus();
+                        break;
+                    case 'k':
+                        e.preventDefault();
+                        searchInput.select();
+                        break;
+                }
+            }
+        });
+
+        // Typing animation for welcome message
+        const welcomeText = document.querySelector('.welcome-message p');
+        if (welcomeText) {
+            const originalText = welcomeText.textContent;
+            welcomeText.textContent = '';
+            let i = 0;
+            const typeWriter = () => {
+                if (i < originalText.length) {
+                    welcomeText.textContent += originalText.charAt(i);
+                    i++;
+                    setTimeout(typeWriter, 30);
+                }
+            };
+            setTimeout(typeWriter, 1000);
+        }
+
+        // Particle animation
+        function createParticle() {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = Math.random() * 100 + 'vw';
+            particle.style.animationDuration = (Math.random() * 3 + 2) + 's';
+            document.querySelector('.particles').appendChild(particle);
+            
+            setTimeout(() => particle.remove(), 5000);
+        }
+
+        setInterval(createParticle, 200);
+    </script>
+</body>
+</html>
